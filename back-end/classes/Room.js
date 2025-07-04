@@ -1,8 +1,3 @@
-//Rooms are not a MeddiaSoup things.MS cares about mediastream, transport
-//things like that.It doesn't carre, or know about rooms
-//Rooms can be inside of clients,clients inside of rooms
-//Transport can belong to rooms or client,etc.
-
 const config = require('../config/config')
 const newDominantSpeaker = require('../utilities/newDominantSpeaker')
 
