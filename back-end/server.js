@@ -1,18 +1,9 @@
-const fs = require('fs') //we need this to read our keys. Part of node
-const https = require('https') //we need this for a secure express server. part of node
+const fs = require('fs') 
+const https = require('https') 
 const http = require('http')
-//express sets up the http server and serves our front end
 const express = require('express')
 const app = express()
-//seve everything in public statically
 app.use(express.static('public'))
-
-//get the keys we made with mkcert
-// const key = fs.readFileSync('./config/cert.key')
-// const cert = fs.readFileSync('./config/cert.crt')
-// const options = {key,cert}
-//use those keys with the https module to have https
-//const httpsServer = https.createServer(options, app)    {Not require https module}
 const httpServer = http.createServer(app)
 
 const socketio = require('socket.io')
@@ -25,31 +16,26 @@ const updateActiveSpeakers = require('./utilities/updateActiveSpeakers')
 const Client = require('./classes/Client')
 const Room = require('./classes/Room')
 const { type } = require('os')
-
-//set up the socketio server, listening by way of our express https sever
 const io = socketio(httpServer, {
     // cors: [`https://localhost:${config.port}`],
     cors: ['http://localhost:5173']
     // cors: [`https://192.168.1.44`]
 })
 
-//our globals
-//init workers, it's where our mediasoup workers will live
+
 let workers = null
-// Router is now manage by the Room objects  
-// Master room array that contains all our Room object
 const rooms = [];
 //initMediaSoup gets mediasoup ready to do its thing
 const initMediaSoup = async () => {
     workers = await createWorkers()
 }
 
-initMediaSoup() //build our mediasoup server/sfu
+initMediaSoup()
 
 // socketIo listeners
 io.on('connect', socket => {
-    let client;  //This client object available to all our socket listeners
-    const handshake = socket.handshake  //socket.handshake is where auth and query live
+    let client;  
+    const handshake = socket.handshake  
     socket.on('joinRoom', async ({ userName, roomName }, ackCb) => {
         let newRoom = false;
         client = new Client(userName, socket)
@@ -70,7 +56,6 @@ io.on('connect', socket => {
         //Add this socket to the socket room
         socket.join(client.room.roomName)
 
-        //fetch the first 0-5 pids in activeSpeakerList 
         const audioPidsToCreate = client.room.activeSpeakerList.slice(0, 5)
         //find the vedioPids and make an array with matching indices
         // for our audioPids
