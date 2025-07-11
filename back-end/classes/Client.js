@@ -1,85 +1,88 @@
 const config = require("../config/config");
 
-class client {
+class Client {
     constructor(userName, socket) {
         this.userName = userName;
         this.socket = socket;
-        //Instead of calling producerTransport call it upStream
         this.upstreamTransport = null;
-        //We will have an audio and vedio consumer
-        this.producer = {}
-        //Instead of calling consumerTransport call it downStream
-        this.downstreamTransports = []
-        // {
-        //     transport,  //will handle both audio and vedio
-        //     associatedVideoPid
-        //     associatedAudioPid
-        //     audio = audioConsumer
-        //     video = videoconsumer
-        // }
-
-        //An array of consumer,each with 2 parts
-        // this.consumers = []
-        //A room object
+        this.producer = {};
         this.room = null;
+        this.downstreamTransports = [];
     }
-    addTransport(type, audioPid = null, videoPid = null) {
-        return new Promise(async (resolve, reject) => {
-            const { listenIps, initialAvailableOutgoingBitrate, maxIncomingBitrate } = config.webRtcTransport
-            const transport = await this.room.router.createWebRtcTransport({
-                enableUdp: true,
-                enableTcp: true,
-                preferUdp: true,
-                listenInfos: listenIps,
-                initialAvailableOutgoingBitrate,
-            });
-            if (maxIncomingBitrate) {
-                try {
-                    await transport.setMaxIncomingBitrate(maxIncomingBitrate)
-                } catch (err) {
-                    console.log('Error setting bitrate')
-                }
-            }
 
-            const clientTransportParams = {
-                id: transport.id,
-                iceParameters: transport.iceParameters,
-                iceCandidates: transport.iceCandidates,
-                dtlsParameters: transport.dtlsParameters,
+    async addTransport(type, audioPid = null, videoPid = null) {
+        const { listenIps, initialAvailableOutgoingBitrate, maxIncomingBitrate } = config.webRtcTransport;
+        
+        const transport = await this.room.router.createWebRtcTransport({
+            enableUdp: true,
+            enableTcp: true,
+            preferUdp: true,
+            listenIps: listenIps,
+            initialAvailableOutgoingBitrate,
+        });
+
+        if (maxIncomingBitrate) {
+            try {
+                await transport.setMaxIncomingBitrate(maxIncomingBitrate);
+            } catch (err) {
+                console.log('Error setting bitrate', err);
             }
-            if (type === 'producer') {
-                //set the new transport to the client's upstreamTransport
-                this.upstreamTransport = transport
-                // setInterval(async()=>{
-                //     const stats = await this.upstreamTransport.getStats()
-                //     for(const report of stats.values()){
-                //         if(report.type === 'webrtc-transport'){
-                //             console.log(report.bytesReceived,'-',report.rtpBytesReceived)
-                //         }
-                //     }
-                // },1000)
-            } else if (type === 'consumer') {
-                this.downstreamTransports.push({
-                    transport,  //will handle both audio and vedio
-                    associatedVideoPid: videoPid,
-                    associatedAudioPid: audioPid,
-                })
-            }
-            resolve(clientTransportParams) //What we send back to the client
-        })
+        }
+
+        const clientTransportParams = {
+            id: transport.id,
+            iceParameters: transport.iceParameters,
+            iceCandidates: transport.iceCandidates,
+            dtlsParameters: transport.dtlsParameters,
+        };
+
+        if (type === 'producer') {
+            this.upstreamTransport = transport;
+        } else if (type === 'consumer') {
+            this.downstreamTransports.push({
+                transport,
+                associatedVideoPid: videoPid,
+                associatedAudioPid: audioPid,
+                audio: null,
+                video: null,
+            });
+        }
+
+        return clientTransportParams;
     }
+
     addProducer(kind, newProducer) {
-        this.producer[kind] = newProducer
-        if (kind === 'audio') {
-            //Add this to our activeSpeakerObserver
+        this.producer[kind] = newProducer;
+        if (kind === 'audio' && this.room && this.room.activeSpeakerObserver) {
             this.room.activeSpeakerObserver.addProducer({
                 producerId: newProducer.id
-            })
+            });
         }
     }
+
     addConsumer(kind, newConsumer, downstreamTransport) {
-        downstreamTransport[kind] = newConsumer
+        if (downstreamTransport) {
+            downstreamTransport[kind] = newConsumer;
+        }
+    }
+
+    findDownstreamByAudioPid(pid) {
+        return this.downstreamTransports.find(
+            t => t?.associatedAudioPid === pid
+        ) || null;
+    }
+
+    findDownstreamByConsumerProducerId(pid) {
+        return this.downstreamTransports.find(
+            t => t?.audio?.producerId === pid
+        ) || null;
+    }
+
+    removeDownstreamTransportByAudioPid(pid) {
+        this.downstreamTransports = this.downstreamTransports.filter(
+            t => !(t?.associatedAudioPid === pid)
+        );
     }
 }
 
-module.exports = client
+module.exports = Client;
